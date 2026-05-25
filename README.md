@@ -1,8 +1,8 @@
-# mcp-notes
+# mcp-memory-notes
 
 > Give your AI a memory — save anything across every conversation, forever.
 
-Your AI forgets everything the moment you close a chat. `mcp-notes` fixes that. It lets your AI remember things you tell it — and recall them days, weeks, or months later in any new conversation.
+Your AI forgets everything the moment you close a chat. `mcp-memory-notes` fixes that. It lets your AI remember things you tell it — and recall them days, weeks, or months later in any new conversation.
 
 Works with **Claude Desktop**, **Claude Code**, **Cursor**, **Windsurf**, and any MCP-compatible AI tool.
 
@@ -13,7 +13,7 @@ Works with **Claude Desktop**, **Claude Code**, **Cursor**, **Windsurf**, and an
 
 ## Real examples — what people actually save
 
-Here's what a normal day looks like with `mcp-notes`:
+Here's what a normal day looks like with `mcp-memory-notes`:
 
 **Remembering personal things:**
 ```
@@ -224,11 +224,11 @@ No account. No cloud. No subscription. The file is yours.
 
 ---
 
-## mcp-notes vs built-in AI memory
+## mcp-memory-notes vs built-in AI memory
 
-Some AI tools have their own built-in memory. Here's how `mcp-notes` is different:
+Some AI tools have their own built-in memory. Here's how `mcp-memory-notes` is different:
 
-| | mcp-notes | Built-in AI memory |
+| | mcp-memory-notes | Built-in AI memory |
 |---|---|---|
 | Stored | On your own computer | On the AI company's servers |
 | You can read it | Yes — it's a plain file you can open | Usually no |
@@ -248,7 +248,7 @@ Some AI tools have their own built-in memory. Here's how `mcp-notes` is differen
   "mcpServers": {
     "notes": {
       "command": "npx",
-      "args": ["-y", "mcp-notes"]
+      "args": ["-y", "mcp-memory-notes"]
     }
   }
 }
@@ -256,13 +256,13 @@ Some AI tools have their own built-in memory. Here's how `mcp-notes` is differen
 
 ### Option 2 — global install
 ```bash
-npm install -g mcp-notes
+npm install -g mcp-memory-notes
 ```
 ```json
 {
   "mcpServers": {
     "notes": {
-      "command": "mcp-notes"
+      "command": "mcp-memory-notes"
     }
   }
 }
@@ -281,7 +281,7 @@ or `%APPDATA%\Claude\claude_desktop_config.json` (Windows):
   "mcpServers": {
     "notes": {
       "command": "npx",
-      "args": ["-y", "mcp-notes"]
+      "args": ["-y", "mcp-memory-notes"]
     }
   }
 }
@@ -290,7 +290,7 @@ Restart Claude Desktop. You'll see **notes** appear in the MCP tools list.
 
 ### Claude Code (CLI)
 ```bash
-claude mcp add notes -- npx -y mcp-notes
+claude mcp add notes -- npx -y mcp-memory-notes
 ```
 
 ### Cursor / Windsurf

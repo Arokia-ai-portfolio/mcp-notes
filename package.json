@@ -1,12 +1,16 @@
 {
-  "name": "mcp-notes",
+  "name": "mcp-memory-notes",
   "version": "1.2.0",
-  "description": "Persistent notes MCP server — give your LLM long-term memory",
+  "description": "Persistent notes MCP server — give your LLM long-term memory across conversations",
   "type": "module",
   "bin": {
-    "mcp-notes": "./dist/index.js"
+    "mcp-memory-notes": "./dist/index.js"
   },
   "main": "./dist/index.js",
+  "files": [
+    "dist",
+    "README.md"
+  ],
   "scripts": {
     "build": "tsc",
     "start": "node dist/index.js",
@@ -27,6 +31,6 @@
   "engines": {
     "node": ">=18.0.0"
   },
-  "keywords": ["mcp", "llm", "notes", "claude", "anthropic", "cursor", "ai"],
+  "keywords": ["mcp", "llm", "notes", "memory", "claude", "anthropic", "cursor", "windsurf", "ai"],
   "license": "MIT"
 }
