@@ -1,179 +1,202 @@
 # mcp-notes
 
-> Persistent notes for your LLM — save, search, and recall information across every conversation.
+> Give your AI a memory — save anything across every conversation, forever.
 
-Built on the [Model Context Protocol (MCP)](https://modelcontextprotocol.io), this plugin works with **Claude Desktop**, **Claude Code**, **Cursor**, **Windsurf**, and any other MCP-compatible AI tool.
+Your AI forgets everything the moment you close a chat. `mcp-notes` fixes that. It lets your AI remember things you tell it — and recall them days, weeks, or months later in any new conversation.
+
+Works with **Claude Desktop**, **Claude Code**, **Cursor**, **Windsurf**, and any MCP-compatible AI tool.
 
 > **Does this work with ChatGPT?**
-> No. MCP is an open standard created by Anthropic. ChatGPT uses a different system entirely. This plugin works with Claude, Cursor, Windsurf, Cline, and any tool that supports MCP.
+> No. This uses the Model Context Protocol (MCP), which ChatGPT does not support. It works with Claude, Cursor, Windsurf, Cline, and any tool that supports MCP.
 
 ---
 
-## Why
+## Real examples — what people actually save
 
-LLMs forget everything when a conversation ends. `mcp-notes` gives your AI a place to write things down — decisions, code snippets, reminders, research — and read them back in any future session.
+Here's what a normal day looks like with `mcp-notes`:
+
+**Remembering personal things:**
+```
+You:    Remember that my mum's birthday is March 15 and she loves flowers.
+Claude: Saved — "Mum's birthday"
+
+--- weeks later, new conversation ---
+
+You:    My mum's birthday is coming up, what should I get her?
+Claude: Based on your note, her birthday is March 15 and she loves flowers.
+        Here are some gift ideas...
+```
+
+**Planning a trip:**
+```
+You:    I'm planning my Japan trip.
+Claude: Got it — context set to "Japan trip". You have 4 notes here.
+
+You:    Remember that flights are cheapest if booked on a Tuesday.
+Claude: Saved.
+
+You:    Note that we need a tourist visa — apply at least 6 weeks before.
+Claude: Saved.
+
+--- next day ---
+
+You:    I'm planning my Japan trip.
+Claude: Context set. You have 6 notes. What do you need?
+
+You:    What do I need to do before I fly?
+Claude: From your notes: apply for a tourist visa at least 6 weeks before,
+        and book flights on a Tuesday for the cheapest prices.
+```
+
+**Work and meetings:**
+```
+You:    Remember that my manager Sarah prefers feedback in writing, not in meetings.
+Claude: Saved — "Manager preference"
+
+You:    Note that the team standup moved to 9am starting next Monday.
+Claude: Saved — "Standup time change"
+
+--- days later ---
+
+You:    I need to give Sarah some feedback, how should I approach it?
+Claude: From your notes, Sarah prefers feedback in writing rather than in meetings.
+```
+
+**Health and daily life:**
+```
+You:    Remember that my doctor said to take vitamin D every morning with food.
+Claude: Saved.
+
+You:    Note that my next dentist appointment is June 20 at 2pm.
+Claude: Saved.
+
+You:    Don't forget — my gym locker combination is 14-32-07.
+Claude: Saved.
+```
 
 ---
 
-## How it works
+## Organising notes by topic (contexts)
 
-When you connect this plugin, your LLM gains 8 new tools it can call automatically. You just talk normally — no special commands needed.
+If you chat about different topics — your trip, your job, your health — use **contexts** to keep them separated. A context is just a label for a topic or project.
 
----
-
-## Organising notes by project (contexts)
-
-If you use multiple projects or chat about different topics, use **contexts** to keep notes separated. A context is just a name you give to a project or topic.
-
-**Step 1 — At the start of each conversation, tell the AI what you're working on:**
+**At the start of a conversation, just say what you're doing:**
 ```
-"I'm working on my ecommerce app"
-"Start a session for: work notes"
-"Set context to: mobile-project"
-```
-The AI calls `set_context` automatically. From that point on in the conversation:
-- Notes you save belong to that project
-- "Show my notes" only shows notes from that project
-- "Search for X" only searches within that project
-
-**Step 2 — Work normally:**
-```
-You:    Remember that the checkout API endpoint is /api/v2/checkout
-Claude: [calls save_note with context "ecommerce app"]
-        Saved — "Checkout API endpoint"
+"I'm planning my Japan trip"
+"Help me with my job search"
+"Let's talk about my kitchen renovation"
+"I'm tracking my fitness goals"
 ```
 
-**Step 3 — Come back the next day in a new conversation:**
-```
-You:    I'm working on my ecommerce app
-Claude: [calls set_context → finds 5 existing notes]
-        Context set to: "ecommerce app". You have 5 notes here.
+The AI sets the context automatically. All notes you save go under that topic. When you come back tomorrow and say the same thing, your notes are all there waiting.
 
-You:    What was the checkout endpoint?
-Claude: [calls search_notes → finds the note instantly]
-        The checkout API endpoint is /api/v2/checkout.
+**To see everything across all topics:**
+```
+"Show all my notes across all topics"
+"Search everything for: dentist"
 ```
 
-**To see everything across all projects:**
+**To switch topics mid-conversation:**
 ```
-"Show all my notes across all projects"
-"Search all projects for: API key"
-```
-
-**To switch projects mid-conversation:**
-```
-"Switch to my mobile-project context"
-"I'm now working on work notes"
+"Switch to my job search notes"
+"I want to talk about my Japan trip now"
 ```
 
 ---
 
 ## How to make the AI ask automatically
 
-Add this to your Claude system prompt (Settings → Custom Instructions) so the AI asks at the start of every chat:
+Add this one line to your Claude custom instructions (Settings → Custom Instructions) so the AI asks at the start of every new chat without you having to remember:
 
 ```
-At the start of each new conversation, ask me which project I am working on,
-then call set_context with my answer before doing anything else.
+At the start of each new conversation, ask me what I would like to talk about or
+work on today, then call set_context with my answer before doing anything else.
+```
+
+After that, every new conversation starts like:
+```
+Claude: What are you working on today?
+You:    My Japan trip.
+Claude: Context set — you have 8 notes about your Japan trip. How can I help?
 ```
 
 ---
 
-## Saving something (without context)
-```
-You:    Remember that my server runs on port 3000.
-Claude: Got it. [calls save_note]
-        Saved — "Server port" (ID: 3f2a1b4c-...)
-```
+## What phrases trigger a save?
 
-**Recalling later — even days later in a brand new conversation:**
-```
-You:    What port does my server run on?
-Claude: [calls search_notes → finds the note]
-        Your server runs on port 3000.
-```
+There are no special commands. Just talk naturally. Any of these work:
 
-**What phrases trigger a save?**
-
-There is no fixed keyword. The LLM understands the meaning of what you say — not just the exact words. Any of these work:
-
-| What you say | What the LLM does |
+| What you say | What happens |
 |---|---|
 | "Remember that..." | Saves a note |
-| "Save a note: ..." | Saves a note |
 | "Don't forget..." | Saves a note |
 | "Note that..." | Saves a note |
+| "Save this: ..." | Saves a note |
 | "Keep in mind..." | Saves a note |
-| "Show all my notes" | Lists all notes |
-| "Search for anything about X" | Searches notes |
+| "Show all my notes" | Lists your notes |
+| "What do I know about X?" | Searches your notes |
+| "Search for anything about X" | Searches your notes |
 | "Update the note about X" | Updates a note |
 | "Delete the note about X" | Deletes a note |
 
-If you're just having a normal conversation, the LLM won't save unless it clearly makes sense to. You're always in control.
+If you're just having a normal conversation, the AI won't save anything unless it clearly makes sense to.
 
-**Can the plugin author see your conversations or notes?**
+---
 
-No. There is no central server, no analytics, no logging. The plugin runs entirely on your own machine. Your notes go only to your local file — nobody else can see them, including the person who built this plugin.
+## Can the plugin author see your notes or conversations?
 
-**Other things you can say:**
-- "Show all my notes"
-- "Search my notes for anything about deadlines"
-- "Update the server note — it's port 8080 now"
-- "Delete the note about port 3000"
-
-The LLM calls the right tool automatically. You never have to mention tool names.
+**No.** There is no server, no account, no analytics. The plugin runs entirely on your own machine. Your notes are saved to a file on your computer — nobody else can see them, including the person who built this plugin.
 
 ---
 
 ## Where are my notes stored?
 
-Notes are saved in a plain JSON file **on your own computer**. Nothing is sent to any server.
+Notes are saved in a plain text file on **your own computer**. Nothing is sent anywhere.
 
 | Platform | Location |
 |---|---|
 | Mac / Linux | `~/.mcp-notes/notes.json` |
 | Windows | `C:\Users\<your-name>\.mcp-notes\notes.json` |
 
-**To view your notes directly:**
-
-On Mac, open Terminal and run:
+**To read your notes file on Mac:**
+Open Terminal and type:
 ```bash
 cat ~/.mcp-notes/notes.json
 ```
 
-Or in Finder: press `Cmd + Shift + G`, type `~/.mcp-notes/`, and open `notes.json` in any text editor. It's plain readable text — you can edit or delete it at any time.
+Or in Finder: press `Cmd + Shift + G`, paste `~/.mcp-notes/`, open `notes.json` in any text editor. It's plain readable text you can edit directly.
 
-**Closing a conversation does not delete your notes.** They stay in the file until you explicitly remove them.
+**Closing a conversation does not delete your notes.** They stay until you remove them.
 
 ---
 
 ## You are in full control
 
-| Action | How to do it |
+| What you want to do | How |
 |---|---|
-| See all notes | Tell your LLM: "list all my notes" |
-| Search notes | Tell your LLM: "search my notes for X" |
-| Edit a note | Tell your LLM: "update my note about X" |
-| Delete a note | Tell your LLM: "delete the note about X" |
+| See all your notes | "Show all my notes" |
+| Find a specific note | "Search for anything about my dentist" |
+| Update a note | "Update my Japan trip note about visas" |
+| Delete a note | "Delete the note about my locker combination" |
 | Wipe everything | Delete the file `~/.mcp-notes/notes.json` |
-| Read notes yourself | Open `~/.mcp-notes/notes.json` in any text editor |
+| Read notes without AI | Open `~/.mcp-notes/notes.json` in any text editor |
 
-No account. No cloud. No dashboard. The file is yours.
+No account. No cloud. No subscription. The file is yours.
 
 ---
 
-## mcp-notes vs built-in LLM memory
+## mcp-notes vs built-in AI memory
 
-Some AI tools have their own built-in memory. Here's how `mcp-notes` differs:
+Some AI tools have their own built-in memory. Here's how `mcp-notes` is different:
 
-| | mcp-notes | Built-in LLM memory |
+| | mcp-notes | Built-in AI memory |
 |---|---|---|
 | Stored | On your own computer | On the AI company's servers |
-| You can read it | Yes — plain JSON file | Usually no direct access |
+| You can read it | Yes — it's a plain file you can open | Usually no |
 | You can edit it | Yes — open in any text editor | Usually no |
-| Survives closing chat | Yes, always | Depends on the tool |
+| Survives closing the chat | Yes, always | Depends on the tool |
 | Works across different AI tools | Yes — Claude, Cursor, Windsurf, etc. | No — locked to one tool |
-| What gets saved | Only what you explicitly ask to save | What the AI decides to remember |
+| What gets saved | Only what you tell it to save | What the AI decides |
 | Private | Fully — never leaves your machine | Stored on external servers |
 
 ---
@@ -238,18 +261,16 @@ Add the same JSON block to your MCP settings file in the app's settings panel.
 
 ## Tools
 
-Once installed, your LLM can use these tools automatically:
-
 | Tool | What it does |
 |---|---|
-| `set_context` | Set the active project context for this conversation |
-| `get_context` | Show the current context and all saved contexts |
-| `save_note` | Save a new note — auto-tagged with the active context |
+| `set_context` | Set the active topic for this conversation |
+| `get_context` | Show the current topic and all saved topics |
+| `save_note` | Save a note — automatically filed under the active topic |
 | `get_note` | Retrieve a note by ID |
-| `list_notes` | List notes (filtered to active context by default) |
-| `search_notes` | Search notes by keyword (active context by default) |
-| `update_note` | Update an existing note or move it to a different context |
-| `delete_note` | Delete a note by ID |
+| `list_notes` | List notes (shows current topic by default) |
+| `search_notes` | Search notes by keyword (current topic by default) |
+| `update_note` | Update a note or move it to a different topic |
+| `delete_note` | Delete a note permanently |
 
 ---
 
@@ -262,20 +283,17 @@ Once installed, your LLM can use these tools automatically:
 | Max content length | 10,000 characters |
 | Max tags per note | 10 |
 | Max tag length | 50 characters |
-| Tag format | Alphanumeric, hyphens, underscores |
 
 ---
 
 ## Security
 
 - **No network access** — runs entirely locally
-- **UUID-based IDs** — note IDs are server-generated UUIDs, never derived from user input
+- **No account required** — nothing to sign up for
 - **Input validation** — all inputs validated with strict schemas
-- **ReDoS protection** — search strings are escaped before regex use
-- **Atomic writes** — notes file is written via temp-then-rename to prevent corruption
-- **Restricted permissions** — storage directory is `0700`, notes file is `0600` (owner-only on Unix)
-- **Schema validation on read** — data read from disk is re-validated before use
-- **Safe error messages** — file paths and stack traces are never exposed to callers
+- **Atomic writes** — notes file uses safe write pattern to prevent corruption
+- **Owner-only file permissions** — your notes file is private to your user account
+- **Safe error messages** — no internal details ever exposed
 
 ---
 
