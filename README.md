@@ -104,6 +104,45 @@ The AI sets the context automatically. All notes you save go under that topic. W
 
 ---
 
+## How notes reach the AI — and what stays private
+
+This is important to understand.
+
+**At the start of every conversation, the AI automatically sees:**
+- A list of your note **titles** grouped by topic
+- Just the titles — nothing else
+
+```
+3 saved notes:
+
+[Japan trip]
+  • Cheapest flight days — saved 2026-05-20
+  • Visa requirements — saved 2026-05-21
+
+[Health]
+  • Morning vitamins — saved 2026-05-22
+```
+
+The AI now knows what notes exist. It can say *"You have a note about Japan visa requirements — want me to read it?"*
+
+**What never goes to the AI automatically:**
+- The content of any note
+- Your actual saved information
+
+Note content only flows to the AI when you explicitly ask:
+```
+"Show me the Japan visa note"
+"What did I save about my vitamins?"
+"Read the note about cheapest flights"
+```
+
+Only that one note's content is sent — nothing else.
+
+**Why this matters:**
+Your notes might contain passwords, health information, personal details, or financial info. None of that is ever pushed to the AI without you asking. You stay in control of what the AI actually reads.
+
+---
+
 ## How to make the AI ask automatically
 
 Add this one line to your Claude custom instructions (Settings → Custom Instructions) so the AI asks at the start of every new chat without you having to remember:

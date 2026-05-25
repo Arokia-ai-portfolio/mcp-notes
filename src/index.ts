@@ -4,8 +4,11 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import {
   CallToolRequestSchema,
   ErrorCode,
+  ListResourcesRequestSchema,
+  ListResourceTemplatesRequestSchema,
   ListToolsRequestSchema,
   McpError,
+  ReadResourceRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import { ZodError } from "zod";
 import { NoteStore } from "./notes.js";
@@ -23,22 +26,156 @@ import {
 const store = new NoteStore();
 
 const server = new Server(
-  { name: "mcp-notes", version: "1.1.0" },
-  { capabilities: { tools: {} } }
+  { name: "mcp-notes", version: "1.2.0" },
+  { capabilities: { tools: {}, resources: {} } }
 );
+
+// ---------------------------------------------------------------------------
+// RESOURCES — auto-loaded at conversation start, titles only, no content
+// Personal note content is NEVER included here — it only flows to the LLM
+// when the user explicitly asks for a specific note via get_note / search_notes
+// ---------------------------------------------------------------------------
+
+server.setRequestHandler(ListResourcesRequestSchema, async () => {
+  const contexts = store.listContexts();
+  return {
+    resources: [
+      {
+        uri: "notes://index",
+        name: "My Notes Index",
+        description:
+          "Titles and topics of all your saved notes. " +
+          "Note content is never included here to protect your privacy. " +
+          "Use get_note or search_notes to read the content of a specific note.",
+        mimeType: "text/plain",
+      },
+      ...contexts.map((ctx) => ({
+        uri: `notes://context/${encodeURIComponent(ctx)}`,
+        name: `Notes: ${ctx}`,
+        description: `Note titles saved under the topic "${ctx}". No content included.`,
+        mimeType: "text/plain",
+      })),
+    ],
+  };
+});
+
+server.setRequestHandler(ListResourceTemplatesRequestSchema, async () => ({
+  resourceTemplates: [
+    {
+      uriTemplate: "notes://context/{name}",
+      name: "Notes by topic",
+      description: "Note titles for a specific topic. No content included.",
+      mimeType: "text/plain",
+    },
+  ],
+}));
+
+server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
+  const { uri } = request.params;
+
+  // --- notes://index — all notes, titles only, grouped by topic ---
+  if (uri === "notes://index") {
+    const all = store.list(undefined, undefined, true);
+
+    if (all.length === 0) {
+      return {
+        contents: [
+          {
+            uri,
+            mimeType: "text/plain",
+            text: 'No notes saved yet. Say "remember that..." to save your first note.',
+          },
+        ],
+      };
+    }
+
+    // Group by context
+    const byContext = new Map<string, typeof all>();
+    const noContext: typeof all = [];
+    for (const note of all) {
+      if (note.context) {
+        if (!byContext.has(note.context)) byContext.set(note.context, []);
+        byContext.get(note.context)!.push(note);
+      } else {
+        noContext.push(note);
+      }
+    }
+
+    const lines: string[] = [
+      `${all.length} saved note(s) — titles only. Content is not shown here to protect your privacy.`,
+      `To read a note say: "show me the note about [title]"`,
+      ``,
+    ];
+
+    for (const [ctx, notes] of byContext) {
+      lines.push(`[${ctx}]`);
+      for (const n of notes) {
+        lines.push(`  • ${n.title} — saved ${n.updatedAt.slice(0, 10)}`);
+      }
+      lines.push("");
+    }
+
+    if (noContext.length > 0) {
+      lines.push("[No topic]");
+      for (const n of noContext) {
+        lines.push(`  • ${n.title} — saved ${n.updatedAt.slice(0, 10)}`);
+      }
+    }
+
+    return {
+      contents: [{ uri, mimeType: "text/plain", text: lines.join("\n").trim() }],
+    };
+  }
+
+  // --- notes://context/{name} — titles for one topic ---
+  const contextMatch = uri.match(/^notes:\/\/context\/(.+)$/);
+  if (contextMatch) {
+    const contextName = decodeURIComponent(contextMatch[1] ?? "");
+    const notes = store.list(undefined, contextName);
+
+    if (notes.length === 0) {
+      return {
+        contents: [
+          {
+            uri,
+            mimeType: "text/plain",
+            text: `No notes saved under "${contextName}".`,
+          },
+        ],
+      };
+    }
+
+    const lines = [
+      `${notes.length} note(s) in "${contextName}" — titles only, no content.`,
+      `To read a note say: "show me the note about [title]"`,
+      ``,
+      ...notes.map((n) => `• ${n.title} — saved ${n.updatedAt.slice(0, 10)}`),
+    ];
+
+    return {
+      contents: [{ uri, mimeType: "text/plain", text: lines.join("\n") }],
+    };
+  }
+
+  throw new McpError(ErrorCode.InvalidRequest, `Unknown resource: ${uri}`);
+});
+
+// ---------------------------------------------------------------------------
+// TOOLS — called on demand, content only flows when user explicitly asks
+// ---------------------------------------------------------------------------
 
 server.setRequestHandler(ListToolsRequestSchema, async () => ({
   tools: [
     {
       name: "set_context",
       description:
-        "Set the active project or conversation context. Once set, all notes saved will belong to this context, and list/search will only show notes from this context. Pass null to clear the context and work across all notes.",
+        "Set the active topic or project for this conversation. All notes saved will be filed under this topic, and list/search will only show notes from this topic. Pass null to clear.",
       inputSchema: {
         type: "object" as const,
         properties: {
           name: {
             type: ["string", "null"],
-            description: "Project or context name (e.g. 'ecommerce-app', 'work-notes'). Pass null to clear.",
+            description: "Topic name (e.g. 'Japan trip', 'work', 'fitness'). Pass null to clear.",
           },
         },
         required: ["name"],
@@ -46,15 +183,13 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     },
     {
       name: "get_context",
-      description: "Get the currently active project context for this conversation.",
-      inputSchema: {
-        type: "object" as const,
-        properties: {},
-      },
+      description: "Get the currently active topic and list all saved topics.",
+      inputSchema: { type: "object" as const, properties: {} },
     },
     {
       name: "save_note",
-      description: "Save a new note with a title, content, and optional tags. Automatically assigned to the active context if one is set.",
+      description:
+        "Save a new note. Automatically filed under the active topic if one is set.",
       inputSchema: {
         type: "object" as const,
         properties: {
@@ -63,11 +198,11 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
           tags: {
             type: "array",
             items: { type: "string" },
-            description: "Optional tags — alphanumeric, hyphens, underscores only (max 10)",
+            description: "Optional tags (max 10)",
           },
           context: {
             type: "string",
-            description: "Override the active context for this note only (optional)",
+            description: "Override the active topic for this note only (optional)",
           },
         },
         required: ["title", "content"],
@@ -75,22 +210,22 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     },
     {
       name: "update_note",
-      description: "Update the title, content, tags, or context of an existing note by its ID.",
+      description: "Update the title, content, tags, or topic of an existing note.",
       inputSchema: {
         type: "object" as const,
         properties: {
           id: { type: "string", description: "Note UUID" },
-          title: { type: "string", description: "New title (max 200 chars)" },
-          content: { type: "string", description: "New content (max 10,000 chars)" },
-          tags: { type: "array", items: { type: "string" }, description: "New tags" },
-          context: { type: ["string", "null"], description: "Move note to a different context, or null to remove context" },
+          title: { type: "string" },
+          content: { type: "string" },
+          tags: { type: "array", items: { type: "string" } },
+          context: { type: ["string", "null"], description: "Move to a different topic, or null to remove topic" },
         },
         required: ["id"],
       },
     },
     {
       name: "get_note",
-      description: "Retrieve the full content of a specific note by its ID.",
+      description: "Retrieve the full content of a specific note by its ID. Only call this when the user explicitly asks to read a note — do not call proactively.",
       inputSchema: {
         type: "object" as const,
         properties: {
@@ -101,24 +236,26 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     },
     {
       name: "list_notes",
-      description: "List saved notes. By default shows only notes in the active context. Use all=true to show notes from every context.",
+      description:
+        "List saved notes. By default shows only notes in the active topic. Use all=true to show notes from every topic.",
       inputSchema: {
         type: "object" as const,
         properties: {
           tag: { type: "string", description: "Filter by tag (optional)" },
-          context: { type: "string", description: "Filter by a specific context (optional, overrides active context)" },
-          all: { type: "boolean", description: "Set true to show notes from all contexts" },
+          context: { type: "string", description: "Filter by a specific topic (optional)" },
+          all: { type: "boolean", description: "Set true to show notes from all topics" },
         },
       },
     },
     {
       name: "search_notes",
-      description: "Search notes by keyword. By default searches only within the active context. Use all=true to search across all contexts.",
+      description:
+        "Search notes by keyword. By default searches only within the active topic. Use all=true to search across all topics.",
       inputSchema: {
         type: "object" as const,
         properties: {
           query: { type: "string", description: "Search keyword (max 200 chars)" },
-          all: { type: "boolean", description: "Set true to search across all contexts" },
+          all: { type: "boolean", description: "Set true to search across all topics" },
         },
         required: ["query"],
       },
@@ -158,7 +295,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
               text: [
                 `Context set to: "${input.name}"`,
                 count > 0
-                  ? `You have ${count} note(s) in this context.`
+                  ? `You have ${count} note(s) in this topic.`
                   : `No notes yet in "${input.name}". Start saving and they'll appear here.`,
               ].join("\n"),
             },
@@ -170,18 +307,15 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const ctx = store.getContext();
         const allContexts = store.listContexts();
         const lines: string[] = [];
-
         if (ctx) {
           lines.push(`Active context: "${ctx}"`);
         } else {
-          lines.push("No active context — showing notes from all projects.");
-          lines.push('Say "I\'m working on [project name]" to filter by project.');
+          lines.push("No active context — showing notes from all topics.");
+          lines.push('Say "I\'m working on [topic]" to filter by topic.');
         }
-
         if (allContexts.length > 0) {
-          lines.push(`\nAll saved contexts: ${allContexts.map((c) => `"${c}"`).join(", ")}`);
+          lines.push(`\nAll saved topics: ${allContexts.map((c) => `"${c}"`).join(", ")}`);
         }
-
         return { content: [{ type: "text" as const, text: lines.join("\n") }] };
       }
 
@@ -196,7 +330,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 `Note saved.`,
                 `ID:      ${note.id}`,
                 `Title:   ${note.title}`,
-                `Context: ${note.context ?? "none"}`,
+                `Topic:   ${note.context ?? "none"}`,
                 `Tags:    ${note.tags.length > 0 ? note.tags.join(", ") : "none"}`,
                 `Created: ${note.createdAt}`,
               ].join("\n"),
@@ -220,7 +354,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           content: [
             {
               type: "text" as const,
-              text: `Note updated.\nID:      ${note.id}\nTitle:   ${note.title}\nContext: ${note.context ?? "none"}\nUpdated: ${note.updatedAt}`,
+              text: `Note updated.\nID:      ${note.id}\nTitle:   ${note.title}\nTopic:   ${note.context ?? "none"}\nUpdated: ${note.updatedAt}`,
             },
           ],
         };
@@ -239,7 +373,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
               text: [
                 `**${note.title}**`,
                 `ID:      ${note.id}`,
-                `Context: ${note.context ?? "none"}`,
+                `Topic:   ${note.context ?? "none"}`,
                 `Tags:    ${note.tags.length > 0 ? note.tags.join(", ") : "none"}`,
                 `Created: ${note.createdAt}`,
                 `Updated: ${note.updatedAt}`,
@@ -255,37 +389,21 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const input = ListNotesInputSchema.parse(args);
         const activeCtx = store.getContext();
         const notes = store.list(input.tag, input.context, input.all);
-
         if (notes.length === 0) {
-          const scope = input.all
-            ? "across all contexts"
-            : activeCtx
-            ? `in context "${activeCtx}"`
-            : "across all contexts";
-          const hint = !input.all && activeCtx
-            ? '\nSay "show all my notes across all projects" to see everything.'
-            : "";
-          return {
-            content: [{ type: "text" as const, text: `No notes found ${scope}.${hint}` }],
-          };
+          const scope = input.all ? "across all topics" : activeCtx ? `in topic "${activeCtx}"` : "across all topics";
+          const hint = !input.all && activeCtx ? '\nSay "show all my notes across all topics" to see everything.' : "";
+          return { content: [{ type: "text" as const, text: `No notes found ${scope}.${hint}` }] };
         }
-
         const lines = notes.map(
           (n) =>
             `• [${n.id}] ${n.title}` +
-            (n.context ? ` [context: ${n.context}]` : "") +
+            (n.context ? ` [topic: ${n.context}]` : "") +
             (n.tags.length > 0 ? ` [tags: ${n.tags.join(", ")}]` : "") +
             ` — ${n.updatedAt.slice(0, 10)}`
         );
-
-        const scope = input.all ? "all contexts" : activeCtx ? `"${activeCtx}"` : "all contexts";
+        const scope = input.all ? "all topics" : activeCtx ? `"${activeCtx}"` : "all topics";
         return {
-          content: [
-            {
-              type: "text" as const,
-              text: `${notes.length} note(s) in ${scope}:\n\n${lines.join("\n")}`,
-            },
-          ],
+          content: [{ type: "text" as const, text: `${notes.length} note(s) in ${scope}:\n\n${lines.join("\n")}` }],
         };
       }
 
@@ -293,33 +411,19 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const input = SearchNotesInputSchema.parse(args);
         const activeCtx = store.getContext();
         const notes = store.search(input.query, input.all);
-
         if (notes.length === 0) {
-          const scope = !input.all && activeCtx ? ` in context "${activeCtx}"` : "";
-          const hint = !input.all && activeCtx
-            ? '\nSay "search all projects for X" to search everywhere.'
-            : "";
-          return {
-            content: [
-              { type: "text" as const, text: `No notes matched "${input.query}"${scope}.${hint}` },
-            ],
-          };
+          const scope = !input.all && activeCtx ? ` in topic "${activeCtx}"` : "";
+          const hint = !input.all && activeCtx ? '\nSay "search all topics for X" to search everywhere.' : "";
+          return { content: [{ type: "text" as const, text: `No notes matched "${input.query}"${scope}.${hint}` }] };
         }
-
         const lines = notes.map(
           (n) =>
             `• [${n.id}] ${n.title}` +
-            (n.context ? ` [context: ${n.context}]` : "") +
+            (n.context ? ` [topic: ${n.context}]` : "") +
             (n.tags.length > 0 ? ` [${n.tags.join(", ")}]` : "")
         );
-
         return {
-          content: [
-            {
-              type: "text" as const,
-              text: `${notes.length} result(s) for "${input.query}":\n\n${lines.join("\n")}`,
-            },
-          ],
+          content: [{ type: "text" as const, text: `${notes.length} result(s) for "${input.query}":\n\n${lines.join("\n")}` }],
         };
       }
 
@@ -329,9 +433,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         if (!deleted) {
           throw new McpError(ErrorCode.InvalidRequest, `Note not found: ${input.id}`);
         }
-        return {
-          content: [{ type: "text" as const, text: `Note ${input.id} deleted.` }],
-        };
+        return { content: [{ type: "text" as const, text: `Note ${input.id} deleted.` }] };
       }
 
       default:
@@ -340,10 +442,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   } catch (err) {
     if (err instanceof McpError) throw err;
     if (err instanceof ZodError) {
-      throw new McpError(
-        ErrorCode.InvalidParams,
-        `Invalid input: ${err.errors.map((e) => e.message).join(", ")}`
-      );
+      throw new McpError(ErrorCode.InvalidParams, `Invalid input: ${err.errors.map((e) => e.message).join(", ")}`);
     }
     throw new McpError(ErrorCode.InternalError, safeErrorMessage(err));
   }
