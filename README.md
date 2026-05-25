@@ -17,9 +17,69 @@ LLMs forget everything when a conversation ends. `mcp-notes` gives your AI a pla
 
 ## How it works
 
-When you connect this plugin, your LLM gains 6 new tools it can call automatically. You just talk normally — no special commands needed.
+When you connect this plugin, your LLM gains 8 new tools it can call automatically. You just talk normally — no special commands needed.
 
-**Saving something:**
+---
+
+## Organising notes by project (contexts)
+
+If you use multiple projects or chat about different topics, use **contexts** to keep notes separated. A context is just a name you give to a project or topic.
+
+**Step 1 — At the start of each conversation, tell the AI what you're working on:**
+```
+"I'm working on my ecommerce app"
+"Start a session for: work notes"
+"Set context to: mobile-project"
+```
+The AI calls `set_context` automatically. From that point on in the conversation:
+- Notes you save belong to that project
+- "Show my notes" only shows notes from that project
+- "Search for X" only searches within that project
+
+**Step 2 — Work normally:**
+```
+You:    Remember that the checkout API endpoint is /api/v2/checkout
+Claude: [calls save_note with context "ecommerce app"]
+        Saved — "Checkout API endpoint"
+```
+
+**Step 3 — Come back the next day in a new conversation:**
+```
+You:    I'm working on my ecommerce app
+Claude: [calls set_context → finds 5 existing notes]
+        Context set to: "ecommerce app". You have 5 notes here.
+
+You:    What was the checkout endpoint?
+Claude: [calls search_notes → finds the note instantly]
+        The checkout API endpoint is /api/v2/checkout.
+```
+
+**To see everything across all projects:**
+```
+"Show all my notes across all projects"
+"Search all projects for: API key"
+```
+
+**To switch projects mid-conversation:**
+```
+"Switch to my mobile-project context"
+"I'm now working on work notes"
+```
+
+---
+
+## How to make the AI ask automatically
+
+Add this to your Claude system prompt (Settings → Custom Instructions) so the AI asks at the start of every chat:
+
+```
+At the start of each new conversation, ask me which project I am working on,
+then call set_context with my answer before doing anything else.
+```
+
+---
+
+## Saving something (without context)
 ```
 You:    Remember that my server runs on port 3000.
 Claude: Got it. [calls save_note]
@@ -182,11 +242,13 @@ Once installed, your LLM can use these tools automatically:
 
 | Tool | What it does |
 |---|---|
-| `save_note` | Save a new note with title, content, and optional tags |
+| `set_context` | Set the active project context for this conversation |
+| `get_context` | Show the current context and all saved contexts |
+| `save_note` | Save a new note — auto-tagged with the active context |
 | `get_note` | Retrieve a note by ID |
-| `list_notes` | List all notes, optionally filtered by tag |
-| `search_notes` | Search notes by keyword across title and content |
-| `update_note` | Update an existing note |
+| `list_notes` | List notes (filtered to active context by default) |
+| `search_notes` | Search notes by keyword (active context by default) |
+| `update_note` | Update an existing note or move it to a different context |
 | `delete_note` | Delete a note by ID |
 
 ---
