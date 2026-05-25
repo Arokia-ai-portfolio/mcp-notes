@@ -33,6 +33,28 @@ Claude: [calls search_notes → finds the note]
         Your server runs on port 3000.
 ```
 
+**What phrases trigger a save?**
+
+There is no fixed keyword. The LLM understands the meaning of what you say — not just the exact words. Any of these work:
+
+| What you say | What the LLM does |
+|---|---|
+| "Remember that..." | Saves a note |
+| "Save a note: ..." | Saves a note |
+| "Don't forget..." | Saves a note |
+| "Note that..." | Saves a note |
+| "Keep in mind..." | Saves a note |
+| "Show all my notes" | Lists all notes |
+| "Search for anything about X" | Searches notes |
+| "Update the note about X" | Updates a note |
+| "Delete the note about X" | Deletes a note |
+
+If you're just having a normal conversation, the LLM won't save unless it clearly makes sense to. You're always in control.
+
+**Can the plugin author see your conversations or notes?**
+
+No. There is no central server, no analytics, no logging. The plugin runs entirely on your own machine. Your notes go only to your local file — nobody else can see them, including the person who built this plugin.
+
 **Other things you can say:**
 - "Show all my notes"
 - "Search my notes for anything about deadlines"
